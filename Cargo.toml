@@ -1,3 +1,0 @@
-[workspace]
-members = ["taproot", "zkp"]
-resolver = "2"
