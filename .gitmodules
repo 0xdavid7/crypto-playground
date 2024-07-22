@@ -1,0 +1,3 @@
+[submodule "evm-contracts/verify-signature/lib/forge-std"]
+	path = evm-contracts/verify-signature/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
