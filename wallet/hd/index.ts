@@ -1,3 +1,13 @@
+import { Address, address } from "@ton/core";
+import BigNumber from "bignumber.js";
+
+import {
+  TonClient,
+  WalletContractV4,
+  WalletContractV5R1,
+  internal,
+} from "@ton/ton";
+
 import {
   deriveEd25519Path,
   keyPairFromSeed,
@@ -107,7 +117,12 @@ const run = async () => {
   }
 
   // recover steps
-  const mnemonics = (await store.get(StorageKey.MNEMONIC)) as any;
+  // const mnemonics = (await store.get(StorageKey.MNEMONIC)) as any;
+
+  const raw =
+    "vault grant math damage slight live equip turtle taxi prize phrase notice";
+
+  const mnemonics = raw.split(" ");
 
   const mnemonicHDSeed = await mnemonicToHDSeed(mnemonics, password);
 
@@ -116,14 +131,165 @@ const run = async () => {
     DerivationPath.toNumberArray()
   );
 
-  console.log("mnemonicHDSeed:", mnemonicHDSeed.toString("hex"));
-
-  console.log("derivedSeed:", derivedSeed.toString("hex"));
-
   const { publicKey, secretKey } = await keyPairFromSeed(derivedSeed);
 
-  console.log("publicKey:", publicKey.toString("hex"));
-  console.log("secretKey:", secretKey.toString("hex"));
+  console.log({
+    publicKey: Buffer.from(publicKey).toString("hex"),
+    secretKey: Buffer.from(secretKey).toString("hex"),
+  });
 };
 
-run();
+// run();
+
+const simulateKeyPair = async () => {
+  const friendly = "EQAPvJW6WmXgNd4vTjtgaqgakKpiujezcCGCPpLBOX78EkS5";
+  const add = address(friendly);
+  console.log({ add: add.toRawString() });
+
+  const pk =
+    "0:0fbc95ba5a65e035de2f4e3b606aa81a90aa62ba37b37021823e92c1397efc12";
+  const pk2 =
+    "0:05eaa5f1bd1ca8844d14dabf0344b85f269625821aa17d251eb7729b5140e860";
+
+  const pk3 =
+    "0:0cf416d62d662d844e3fb7b7ea4de53af5a2a0eefe71f9ff0cf7a0f19aa13550";
+
+  // 0:
+  // 0:05eaa5f1bd1ca8844d14dabf0344b85f269625821aa17d251eb7729b5140e860
+
+  //encrypt_pk: 0cf416d62d662d844e3fb7b7ea4de53af5a2a0eefe71f9ff0cf7a0f19aa13550
+  console.log({
+    wallet: Address.parse(pk).toString(),
+  });
+
+  console.log({
+    wallet2: Address.parseRaw(pk2).toString(),
+  });
+
+  console.log({
+    wallet3: Address.parse(pk3).toString(),
+  });
+
+  const balanceBN = new BigNumber("1000000000");
+  const res = balanceBN.dividedBy(1e9).toFixed(4);
+  console.log({ res });
+};
+
+const simulateCalFee = async () => {
+  const publicKey = Buffer.from(
+    "0cf416d62d662d844e3fb7b7ea4de53af5a2a0eefe71f9ff0cf7a0f19aa13550"
+  );
+
+  const secretKey = Buffer.from(
+    "fbd828712bb750ac002c7012696031985c6c72a77d43ae1986652381cea9780c0cf416d62d662d844e3fb7b7ea4de53af5a2a0eefe71f9ff0cf7a0f19aa13550"
+  );
+
+  // Create Client
+  const client = new TonClient({
+    endpoint: "https://testnet.toncenter.com/api/v2/jsonRPC",
+  });
+
+  // Create wallet contract
+  let workchain = 0; // Usually you need a workchain 0
+  let wallet = WalletContractV4.create({
+    workchain,
+    publicKey,
+  });
+  let contract = client.open(wallet);
+
+  // Get balance
+  let balance: bigint = await contract.getBalance();
+
+  // Create a transfer
+  let seqno: number = await contract.getSeqno();
+  let transfer = await contract.createTransfer({
+    seqno,
+    secretKey,
+    messages: [
+      internal({
+        value: "1.5",
+        to: "EQCD39VS5jcptHL8vMjEXrzGaRcCVYto7HUn4bpAOg8xqB2N",
+        body: "Hello world",
+      }),
+    ],
+  });
+};
+
+const main = async () => {
+  const source = "EQCio9-JHjka8GWq0hRWsdLM4ctsgZvqhKSx8aObTFlOoazz";
+  console.log({
+    raw: fromFriendlyToRaw(source),
+  });
+
+  const publicKey = Buffer.from(
+    "0cf416d62d662d844e3fb7b7ea4de53af5a2a0eefe71f9ff0cf7a0f19aa13550",
+    "hex"
+  );
+
+  // dbb2393458726b2d0bce9d5968a8e810a0b886099026ab3dd8967203b90525f4
+
+  // dbb2393458726b2d0bce9d5968a8e810a0b886099026ab3dd8967203b90525f4
+  console.log("V5R1");
+  const wallet = WalletContractV5R1.create({
+    workChain: 0,
+    walletId: {
+      networkGlobalId: -3,
+    },
+    publicKey,
+  });
+
+  const wallet1 = WalletContractV5R1.create({
+    walletId: {
+      networkGlobalId: -239,
+    },
+    publicKey,
+  });
+
+  const wallet2 = WalletContractV5R1.create({
+    workChain: 0,
+    publicKey,
+  });
+
+  console.log({
+    wallet: wallet.address.toRawString(),
+    wallet1: wallet1.address.toRawString(),
+    wallet2: wallet2.address.toRawString(),
+  });
+
+  console.log("V4");
+
+  const wallet3 = WalletContractV4.create({
+    workchain: 0,
+    publicKey,
+  });
+
+  const wallet4 = WalletContractV4.create({
+    workchain: 0,
+    publicKey,
+  });
+
+  const wallet5 = WalletContractV4.create({
+    workchain: 0,
+    publicKey,
+  });
+
+  console.log({
+    wallet3: wallet3.address.toRawString(),
+    wallet4: wallet4.address.toRawString(),
+    wallet5: wallet5.address.toRawString(),
+  });
+  
+  console.log({
+    friendly: fromRawToFriendly(wallet1.address.toRawString()),
+  })
+};
+
+const fromFriendlyToRaw = (source: string) => {
+  return address(source).toRawString();
+};
+
+const fromRawToFriendly = (source: string) => {
+  return address(source).toString();
+};
+
+main();
