@@ -1,2 +1,0 @@
-mod ec;
-mod tests;
