@@ -1,12 +1,9 @@
 use std::collections::HashMap;
 
-use ark_bls12_381::{Fr, G1Affine, G1Projective};
-use ark_ec::{CurveGroup, PrimeGroup};
-use ark_ff::{Field, One, Zero};
-use ark_std::{
-    rand::{rngs, RngCore, SeedableRng},
-    UniformRand,
-};
+use ark_bls12_381::{Bls12_381, Fr, G1Affine, G1Projective, G2Affine, G2Projective};
+use ark_ec::{pairing::Pairing, AffineRepr, CurveGroup, PrimeGroup};
+use ark_ff::{Field, One, PrimeField, Zero};
+use ark_std::{rand::RngCore, UniformRand};
 use errors::MPCError;
 use key::KeyShare;
 use sha2::{Digest, Sha256};
@@ -20,7 +17,7 @@ mod sig;
 pub struct MPCWallet {
     pub threshold: usize,
     pub total_participants: usize,
-    pub public_key: G1Affine,
+    pub public_key: G2Affine,
 }
 
 impl MPCWallet {
@@ -68,7 +65,7 @@ impl MPCWallet {
             }
 
             // Calculate the public key share g^{secret_share}
-            let generator = G1Projective::generator();
+            let generator = G2Projective::generator();
             let public_key_share = (generator * secret_share).into_affine();
 
             shares.push(KeyShare {
@@ -79,7 +76,7 @@ impl MPCWallet {
         }
 
         // Calculate the master public key g^{secret_key}
-        let generator = G1Projective::generator();
+        let generator = G2Projective::generator();
         let public_key = (generator * secret_key).into_affine();
 
         Ok((
@@ -100,6 +97,25 @@ impl MPCWallet {
         SignatureShare {
             index: key_share.index,
             share: sig_share,
+        }
+    }
+
+    pub fn verify(
+        public_key: &G2Affine,
+        message: &[u8],
+        signature: &G1Affine,
+    ) -> Result<(), MPCError> {
+        let message_point = Self::hash_to_curve(message).into_affine();
+
+        let g2_generator = G2Affine::generator();
+
+        let lhs = Bls12_381::pairing(*signature, g2_generator);
+        let rhs = Bls12_381::pairing(message_point, *public_key);
+
+        if lhs == rhs {
+            Ok(())
+        } else {
+            Err(MPCError::VerificationFailed)
         }
     }
 
@@ -144,48 +160,18 @@ impl MPCWallet {
         Ok(combined_sig.into_affine())
     }
 
-    pub fn verify(
-        public_key: &G1Affine,
-        message: &[u8],
-        signature: &G1Affine,
-    ) -> Result<(), MPCError> {
-        let message_point = Self::hash_to_curve(message);
-
-        let message_proj = message_point;
-        let signature_proj = G1Projective::from(*signature);
-
-        // In a true BLS signature scheme, we would use pairing checks
-        if !signature.is_on_curve() || !signature.is_in_correct_subgroup_assuming_on_curve() {
-            return Err(MPCError::VerificationFailed);
-        }
-
-        // A simplified check: verify signature is not the identity
-        if signature_proj.is_zero() {
-            return Err(MPCError::VerificationFailed);
-        }
-
-        // TODO: Implement the actual BLS signature verification
-
-        Ok(())
-    }
-
     fn hash_to_curve(message: &[u8]) -> G1Projective {
-        let mut hasher = Sha256::new();
-        hasher.update(message);
-        let hash_result = hasher.finalize();
-
-        // WARN: Just generate a random point - this is not secure, just for illustration
-        let mut seed = [0u8; 32];
-        seed.copy_from_slice(&hash_result);
-
-        let mut rng = rngs::StdRng::from_seed(seed);
-
-        G1Projective::generator() * Fr::rand(&mut rng)
+        let hash = Sha256::digest(message);
+        let mut bytes = [0u8; 32];
+        bytes.copy_from_slice(&hash[..32]);
+        let scalar = Fr::from_le_bytes_mod_order(&bytes);
+        G1Projective::generator() * scalar
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use ark_bls12_381::G2Projective;
     use ark_std::test_rng;
 
     use super::*;
@@ -208,6 +194,27 @@ mod tests {
         let message = b"hello world";
         let point = MPCWallet::hash_to_curve(message);
         println!("point: {:?}", point);
+    }
+
+    #[test]
+    fn test_sign_and_verify() {
+        let mut rng = test_rng();
+
+        // Generate a random key
+        let sk = Fr::rand(&mut rng);
+        let pk = (G2Projective::generator() * sk).into_affine();
+
+        let key_share = KeyShare {
+            index: 0,
+            secret_share: sk,
+            public_key_share: pk,
+        };
+
+        let message = b"hello MPC BLS!";
+        let sig = MPCWallet::sign_share(message, &key_share);
+
+        let result = MPCWallet::verify(&pk, message, &sig.share);
+        assert!(result.is_ok(), "Signature should verify");
     }
 
     #[test]
@@ -236,5 +243,10 @@ mod tests {
             .unwrap();
 
         println!("Generated signature: {:?}", signature);
+
+        // Verify the signature
+        let result = MPCWallet::verify(&wallet.public_key, message, &signature)
+            .map_err(|e| println!("Error verifying signature: {:?}", e));
+        assert!(result.is_ok(), "Signature should verify");
     }
 }

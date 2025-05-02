@@ -1,4 +1,4 @@
-use ark_bls12_381::{Fr, G1Affine};
+use ark_bls12_381::{Fr, G2Affine};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Read, Write};
 
 use crate::errors::MPCError;
@@ -8,7 +8,7 @@ use crate::errors::MPCError;
 pub struct KeyShare {
     pub index: u32,
     pub secret_share: Fr,
-    pub public_key_share: G1Affine,
+    pub public_key_share: G2Affine,
 }
 
 impl KeyShare {
@@ -30,7 +30,7 @@ impl KeyShare {
             .map_err(|e| MPCError::SerializationError(e.to_string()))?;
         let secret_share = Fr::deserialize_uncompressed(&mut reader)
             .map_err(|e| MPCError::SerializationError(e.to_string()))?;
-        let public_key_share = G1Affine::deserialize_uncompressed(&mut reader)
+        let public_key_share = G2Affine::deserialize_uncompressed(&mut reader)
             .map_err(|e| MPCError::SerializationError(e.to_string()))?;
 
         Ok(Self {
@@ -50,7 +50,7 @@ mod tests {
         let key_share = KeyShare {
             index: 1,
             secret_share: Fr::from(1),
-            public_key_share: G1Affine::generator(),
+            public_key_share: G2Affine::generator(),
         };
         println!("{:?}", key_share.public_key_share);
         let mut writer = Vec::new();
