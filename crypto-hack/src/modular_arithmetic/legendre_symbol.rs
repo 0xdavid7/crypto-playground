@@ -33,7 +33,9 @@
 use std::str::FromStr;
 
 use lazy_static::lazy_static;
-use num_bigint::{BigUint, ToBigUint};
+use num_bigint::BigUint;
+
+use super::{FOUR, ONE, TWO, ZERO};
 
 pub enum LegendreSymbol {
     QuadraticResidue,
@@ -42,12 +44,6 @@ pub enum LegendreSymbol {
 }
 
 lazy_static! {
-    static ref ZERO: BigUint = ToBigUint::to_biguint(&0).unwrap();
-    static ref ONE: BigUint = ToBigUint::to_biguint(&1).unwrap();
-    static ref TWO: BigUint = ToBigUint::to_biguint(&2).unwrap();
-    static ref THREE: BigUint = ToBigUint::to_biguint(&3).unwrap();
-    static ref FOUR: BigUint = ToBigUint::to_biguint(&4).unwrap();
-
     static ref PRIME: BigUint = BigUint::from_str(
         "101524035174539890485408575671085261788758965189060164484385690801466167356667036677932998889725476582421738788500738738503134356158197247473850273565349249573867251280253564698939768700489401960767007716413932851838937641880157263936985954881657889497583485535527613578457628399173971810541670838543309159139"
     ).unwrap();
@@ -65,7 +61,7 @@ lazy_static! {
     };
 }
 
-fn legendre_symbol(a: &BigUint) -> LegendreSymbol {
+pub fn legendre_symbol(a: &BigUint) -> LegendreSymbol {
     if a.modpow(&ONE, &PRIME) == *ZERO {
         return LegendreSymbol::QuadraticIndeterminate;
     }
@@ -112,10 +108,12 @@ mod tests {
                     let root = a.modpow(&((PRIME.clone() + ONE.clone()) / FOUR.clone()), &PRIME);
                     // with Legendre Symbol, a^(p-1)/2 = 1 mod p
                     // with fermat's little theorem, a^(p-1) = 1 mod p
-                    // root^2 = a mod p
+                    // given that: root^2 = a mod p
                     // root^2 = a * a^((p-1)/2) mod p
                     // root^2 = a^((p+1)/2) mod p
                     // root = a^((p+1)/4) mod p
+                    println!("{:?} is a quadratic residue", a);
+                    println!("root = {:?}", root);
                 }
                 LegendreSymbol::QuadraticNonResidue => {}
                 _ => println!("{:?} is not a quadratic residue", a),
